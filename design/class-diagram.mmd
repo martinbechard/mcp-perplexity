@@ -1,0 +1,62 @@
+classDiagram
+    class PerplexityServer {
+        -server: Server
+        -apiKey: string
+        -baseURL: string
+        -logs: string[]
+        +constructor(apiKey: string)
+        -trace(message: string)
+        -setupHandlers()
+        +initialize()
+        +getServer()
+    }
+
+    class ChatCompletionConfig {
+        +model: string
+        +messages: Message[]
+        +maxTokens?: number
+        +temperature?: number
+        +topP?: number
+        +searchDomainFilter?: string[]
+        +returnImages?: boolean
+        +returnRelatedQuestions?: boolean
+        +searchRecencyFilter?: string
+        +topK?: number
+        +stream?: boolean
+        +presencePenalty?: number
+        +frequencyPenalty?: number
+    }
+
+    class Message {
+        +role: string
+        +content: string
+    }
+
+    class ChatCompletionResponse {
+        +id: string
+        +model: string
+        +object: string
+        +created: number
+        +citations: string[]
+        +choices: Choice[]
+        +usage: Usage
+    }
+
+    class Choice {
+        +index: number
+        +finishReason: string
+        +message: Message
+        +delta: any
+    }
+
+    class Usage {
+        +promptTokens: number
+        +completionTokens: number
+        +totalTokens: number
+    }
+
+    PerplexityServer -- ChatCompletionConfig : uses
+    ChatCompletionConfig -- Message : contains
+    ChatCompletionResponse -- Choice : contains
+    ChatCompletionResponse -- Usage : contains
+    Choice -- Message : contains
