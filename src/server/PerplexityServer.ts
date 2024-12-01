@@ -13,6 +13,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ReadResourceRequestSchema,
   TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -48,42 +49,7 @@ export class PerplexityServer {
       },
       {
         capabilities: {
-          tools: {
-            perplexity_search: {
-              description:
-                "Search the internet and get AI-powered answers using Perplexity API",
-              inputSchema: {
-                type: "object",
-                properties: {
-                  messages: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        role: {
-                          type: "string",
-                          enum: ["system", "user"],
-                        },
-                        content: {
-                          type: "string",
-                        },
-                      },
-                      required: ["role", "content"],
-                    },
-                  },
-                  searchDomainFilter: {
-                    type: "array",
-                    items: {
-                      type: "string",
-                    },
-                    description:
-                      "Optional list of domains to restrict search results",
-                  },
-                },
-                required: ["messages"],
-              },
-            },
-          },
+          tools: {},
           prompts: {},
           sampling: {},
           resources: {},
@@ -316,7 +282,7 @@ export class PerplexityServer {
           resources: [
             {
               uri: "logs://current",
-              name: "Server Logs",
+              name: "Current Server Logs",
               description: "View the current server logs without clearing them",
               mimeType: "text/plain",
             },
@@ -325,6 +291,44 @@ export class PerplexityServer {
 
         if (Logger.isDebugEnabled()) {
           await Logger.trace("Protocol: ListResources response ready");
+        }
+
+        return response;
+      }
+    );
+
+    // Resource template handler for log tail
+    this.server.setRequestHandler(
+      ListResourceTemplatesRequestSchema,
+      async () => {
+        if (Logger.isDebugEnabled()) {
+          await Logger.trace(
+            "Protocol: ListResourceTemplates request received"
+          );
+        }
+
+        const response = {
+          resourceTemplates: [
+            {
+              uriTemplate: "logs://tail/{length}",
+              name: "Last N Server Logs",
+              description: "View the last N server log entries (default: 10)",
+              mimeType: "text/plain",
+              parameters: {
+                length: {
+                  type: "integer",
+                  description: "Number of log entries to return",
+                  default: 10,
+                  minimum: 1,
+                  required: false,
+                },
+              },
+            },
+          ],
+        };
+
+        if (Logger.isDebugEnabled()) {
+          await Logger.trace("Protocol: ListResourceTemplates response ready");
         }
 
         return response;
@@ -350,6 +354,40 @@ export class PerplexityServer {
                   text:
                     Logger.getLogContent().join("<BR>\n") ||
                     "No logs available",
+                },
+              ],
+            };
+
+            if (Logger.isDebugEnabled()) {
+              await Logger.trace(
+                "Protocol: ReadResource response ready",
+                response
+              );
+            }
+
+            return response;
+          }
+
+          // Handle both forms: logs://tail and logs://tail/{length}
+          const tailMatch = request.params.uri.match(
+            /^logs:\/\/tail(?:\/(\d*))?$/
+          );
+          if (tailMatch) {
+            const length = tailMatch[1] ? parseInt(tailMatch[1], 10) : 10;
+
+            if (length < 1) {
+              throw new Error("Length parameter must be a positive integer");
+            }
+
+            const logs = Logger.getLogContent();
+            const tailLogs = logs.slice(-length);
+
+            const response = {
+              contents: [
+                {
+                  uri: request.params.uri,
+                  mimeType: "text/markdown",
+                  text: tailLogs.join("<BR>\n") || "No logs available",
                 },
               ],
             };

@@ -28,6 +28,7 @@ This server provides integration between the Model Context Protocol (MCP) and Pe
    - PerplexityServer exposes logs through MCP resource handlers
    - Uses JavaScript template literals for log messages instead of message templates
    - Follows the example filesystem server's logging pattern
+   - Supports retrieving the last N log entries through logs://tail/{length}
 
 3. MCP Integration Points
    - Tool Registration: Exposes search functionality
@@ -65,6 +66,8 @@ Main server class that implements the Model Context Protocol and integrates with
    Source: Project knowledge base
 5. MUST expose server logs through MCP resources
    Source: Example filesystem server implementation
+6. MUST support retrieving last N log entries
+   Source: Requirements update
 
 ## Design Considerations
 
@@ -111,8 +114,14 @@ Main server class that implements the Model Context Protocol and integrates with
        resources: [
          {
            uri: "logs://current",
-           name: "Server Logs",
+           name: "Current Server Logs",
            description: "View the current server logs without clearing them",
+           mimeType: "text/plain",
+         },
+         {
+           uri: "logs://tail/{length}",
+           name: "Last N Server Logs",
+           description: "View the last N server log entries (default: 10)",
            mimeType: "text/plain",
          },
        ],
@@ -133,6 +142,26 @@ Main server class that implements the Model Context Protocol and integrates with
              ],
            };
          }
+
+         const tailMatch = request.params.uri.match(/^logs:\/\/tail\/(\d*)$/);
+         if (tailMatch) {
+           const length = tailMatch[1] ? parseInt(tailMatch[1], 10) : 10;
+           if (length < 1) {
+             throw new Error("Length parameter must be a positive integer");
+           }
+           const logs = Logger.getLogContent();
+           const tailLogs = logs.slice(-length);
+           return {
+             contents: [
+               {
+                 uri: request.params.uri,
+                 mimeType: "text/markdown",
+                 text: tailLogs.join("<BR>\n") || "No logs available",
+               },
+             ],
+           };
+         }
+
          throw new Error(`Resource not found: ${request.params.uri}`);
        }
      );
@@ -237,7 +266,7 @@ Main server class that implements the Model Context Protocol and integrates with
    - Sets up all MCP protocol handlers
    - Pseudocode:
      ```typescript
-     - Register resource handlers (logs)
+     - Register resource handlers (logs://current, logs://tail/{length})
      - Register tool handlers (perplexity_search)
      - Register prompt handlers
      - Setup error handlers
